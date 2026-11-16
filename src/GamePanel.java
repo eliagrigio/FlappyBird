@@ -12,11 +12,13 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
     Bird bird;
     ArrayList<Pipe> pipes;
+    ArrayList<Coin> coins;
 
     int velocityY = 0;
     int velocityX = -4;
     int gravity = 1;
     double score = 0;
+    double scoreCoins = 0;
 
     boolean gameOver = false;
     boolean gameStarted = false;
@@ -38,6 +40,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
         bird = new Bird(boardWidth / 8, boardHeight / 2, 34, 24);
         pipes = new ArrayList<>();
+        coins = new ArrayList<>();
 
         // Menu iniziale
         menuPanel = new MenuPanel(boardWidth, boardHeight);
@@ -57,7 +60,7 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         restartButton.addActionListener(e -> restartGame());
         add(restartButton);
 
-        placePipeTimer = new Timer(1500, e -> placePipes());
+        placePipeTimer = new Timer(1500, e -> placePipesAndCoins());
         gameLoop = new Timer(1000 / 60, this);
         gameLoop.start();
     }
@@ -73,21 +76,32 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         bird.y = boardHeight / 2;
         velocityY = 0;
         pipes.clear();
+        coins.clear();
         score = 0;
+        scoreCoins = 0;
         gameOver = false;
         restartButton.setVisible(false);
         placePipeTimer.start();
         requestFocusInWindow();
     }
 
-    private void placePipes() {
+    private void placePipesAndCoins() {
         int pipeHeight = 512;
         int randomPipeY = (int)(-pipeHeight / 4 - Math.random() * (pipeHeight / 2));
         int openingSpace = boardHeight / 4;
 
         pipes.add(new Pipe(boardWidth, randomPipeY, 64, pipeHeight, true));
         pipes.add(new Pipe(boardWidth, randomPipeY + pipeHeight + openingSpace, 64, pipeHeight, false));
+
+        if(Math.random() < 0.5){
+            //altezza casuale di spawn tra i tubi
+            int randomCoinY = randomPipeY + pipeHeight + (int)(Math.random() * (openingSpace - 32));
+            //aggiugnta moneta alla lista
+            coins.add(new Coin(1, boardWidth, randomCoinY, 32, 32));
+        }
     }
+
+
 
     @Override
     public void paintComponent(Graphics g){
@@ -110,6 +124,12 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
             g2d.fillRect(pipe.x, pipe.y, pipe.width, pipe.height);
         }
 
+        //disegno coin
+        g2d.setColor(Color.yellow);
+        for(Coin coin : coins){
+            g2d.fillRect(coin.x, coin.y, coin.width, coin.height);
+        }
+
         // Punteggio e Game Over
         g2d.setColor(Color.white);
         g2d.setFont(new Font("Arial Black", Font.BOLD, 32));
@@ -119,10 +139,12 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
 
             g2d.setFont(new Font("Arial", Font.BOLD, 20));
             g2d.drawString("Punteggio: " + (int) score, 110, boardHeight / 2 - 15);
+            g2d.drawString("Coins: " + scoreCoins,400, boardHeight / 2 - 15 );
 
             restartButton.setVisible(true); // Mostra il pulsante
         } else {
             g2d.drawString(String.valueOf((int) score), 20, 45);
+            g2d.drawString(String.valueOf((int) scoreCoins), 500, 45);
         }
     }
 
@@ -142,13 +164,24 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
                 pipe.passes = true;
             }
 
-            if(collision(bird, pipe)){
+            if(collisionPipe(bird, pipe)){
                 gameOver = true;
                 gameOverTime = System.currentTimeMillis(); // Registra il momento esatto del game over
             }
         }
 
+        for(int i = 0; i<coins.size(); i++){
+            Coin coin = coins.get(i);
+            coin.x += velocityX;
+
+            if(collisionCoin(bird, coin)){
+                scoreCoins += 1;
+                coins.remove(i);
+            }
+        }
+
         pipes.removeIf(pipe -> pipe.x + pipe.width < 0);
+        coins.removeIf(coin -> coin.x + coin.width < 0);
 
         if(bird.y > boardHeight){
             gameOver = true;
@@ -160,7 +193,14 @@ public class GamePanel extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-    public boolean collision(Bird a, Pipe b) {
+    public boolean collisionPipe(Bird a, Pipe b) {
+        return a.x < b.x + b.width &&
+                a.x + a.width > b.x &&
+                a.y < b.y + b.height &&
+                a.y + a.height > b.y;
+    }
+
+    public boolean collisionCoin(Bird a, Coin b) {
         return a.x < b.x + b.width &&
                 a.x + a.width > b.x &&
                 a.y < b.y + b.height &&
